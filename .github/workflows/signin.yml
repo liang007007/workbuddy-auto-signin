@@ -1,0 +1,37 @@
+name: WorkBuddy 自动签到（云端 · 无客户端）
+
+# 云端没有客户端可借：明文凭据由本机每 7 天导出并推送进仓库 Secret WORKBUDDY_PLAIN_CREDS。
+# 云端与本机跑的是同一套 signin.py（auto = 签到 + 成长中心）。
+on:
+  schedule:
+    - cron: "30 6 * * *"          # UTC 06:30 ≈ 北京 14:30（与本机定时任务同频）
+  workflow_dispatch: {}           # 支持在 Actions 页面手动触发
+
+permissions:
+  contents: read
+
+jobs:
+  signin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: 从 Secret 写入凭据（仅本次运行存在，权限 600）
+        shell: bash
+        env:
+          WORKBUDDY_PLAIN_CREDS: ${{ secrets.WORKBUDDY_PLAIN_CREDS }}
+        run: |
+          printf '%s' "$WORKBUDDY_PLAIN_CREDS" > "$GITHUB_WORKSPACE/creds.info"
+          chmod 600 "$GITHUB_WORKSPACE/creds.info"
+
+      - name: 运行 signin.py auto（与本机同一套脚本）
+        env:
+          WORKBUDDY_AUTH_FILE: ${{ github.workspace }}/creds.info
+        run: python signin.py auto
